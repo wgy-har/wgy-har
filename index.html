@@ -48,12 +48,13 @@
     background: rgba(255,255,255,0.2);
     padding: 6px 12px;
     border-radius: 20px;
+    cursor: pointer;
   }
   .sync-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #ccc;
+    background: #4caf50;
     display: inline-block;
   }
   .stats-bar {
@@ -342,35 +343,91 @@
     padding: 15px;
     font-size: 13px;
   }
-  .loading-overlay {
-    display: flex;
+  .modal-overlay {
+    display: none;
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, #fff0f0 0%, #fff5f5 100%);
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
     z-index: 9999;
     justify-content: center;
     align-items: center;
-    flex-direction: column;
   }
-  .loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 4px solid #ffe0e0;
-    border-top-color: #c41e3a;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 20px;
+  .modal-card {
+    background: #fff;
+    padding: 30px;
+    border-radius: 16px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
   }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-  .loading-text {
+  .modal-card h3 {
     color: #c41e3a;
-    font-size: 16px;
+    margin-bottom: 15px;
+    font-size: 20px;
+  }
+  .modal-card p {
+    color: #666;
+    font-size: 13px;
+    margin-bottom: 15px;
+    line-height: 1.6;
+  }
+  .modal-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 12px;
+    border: 2px solid #ffe0e0;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 12px;
+    resize: vertical;
+    outline: none;
+  }
+  .modal-textarea:focus { border-color: #ff416c; }
+  .modal-btns {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+  }
+  .modal-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
     font-weight: bold;
+    font-family: inherit;
+  }
+  .modal-btn-primary {
+    background: linear-gradient(90deg, #ff416c, #c41e3a);
+    color: white;
+  }
+  .modal-btn-secondary {
+    background: #f5f5f5;
+    color: #666;
+  }
+  .sync-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 15px;
+  }
+  .sync-btn {
+    flex: 1;
+    padding: 10px;
+    background: #fff;
+    border: 2px solid #ffe0e0;
+    border-radius: 8px;
+    color: #c41e3a;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: bold;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .sync-btn:hover {
+    background: #fff0f0;
+    border-color: #ff416c;
   }
   @media (max-width: 768px) {
     .main-content { flex-direction: column; }
@@ -378,36 +435,22 @@
     .stats-bar { flex-wrap: wrap; gap: 10px; }
     .stat-item { min-width: 80px; }
     .header-actions { display: none; }
+    .sync-actions { flex-direction: column; }
   }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js');
-    });
-  }
-</script>
 <base target="_blank">
 </head>
 <body>
 
-<!-- 加载层 -->
-<div id="loadingOverlay" class="loading-overlay">
-  <div class="loading-spinner"></div>
-  <div class="loading-text">🏔️ 正在连接石大考研打卡系统...</div>
-</div>
-
-<div class="container" id="container" style="display:none;">
+<div class="container">
   <div class="header">
     <h1>🏔️ 石河子大学考研复盘打卡系统</h1>
-    <p>专科应届生逆袭211 · 在职无休版 · 数据自动保存</p>
+    <p>专科应届生逆袭211 · 在职无休版 · 本地存储模式</p>
     <div class="header-actions">
-      <div class="sync-badge">
-        <span id="syncStatusDot" class="sync-dot"></span>
-        <span id="syncStatusText" style="color:white; opacity:0.9;">未登录</span>
+      <div class="sync-badge" onclick="showExportModal()">
+        <span class="sync-dot"></span>
+        <span style="color:white; opacity:0.9;">本地模式</span>
       </div>
-      <span id="userEmail" style="color:white; opacity:0.9; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">3224118667@qq.com</span>
     </div>
   </div>
 
@@ -465,6 +508,10 @@
           <span>未来</span>
         </div>
       </div>
+      <div class="sync-actions">
+        <button class="sync-btn" onclick="showExportModal()">📤 导出数据</button>
+        <button class="sync-btn" onclick="showImportModal()">📥 导入数据</button>
+      </div>
     </div>
 
     <div class="task-panel">
@@ -478,7 +525,7 @@
       <div class="task-summary">
         <div class="summary-title">今日学习时长</div>
         <div class="summary-num" id="todayHours">0h</div>
-        <div class="summary-text" id="todayStatus">点击上方任务勾选，数据自动保存</div>
+        <div class="summary-text" id="todayStatus">点击上方任务勾选，数据自动保存到本地</div>
       </div>
 
       <button class="save-btn" id="saveBtn" onclick="saveToday()">💾 保存今日打卡</button>
@@ -487,16 +534,37 @@
 
   <div class="footer">
     <strong>🏔️ 石河子大学 · 化学化工学院 · 2029级研究生</strong>
-    <p style="margin-top:5px;">数据实时同步至云端，换设备打开网页自动恢复全部记录</p>
+    <p style="margin-top:5px;">数据保存在浏览器本地，换设备请点击左侧"导出/导入"同步</p>
+  </div>
+</div>
+
+<!-- 导出弹窗 -->
+<div id="exportModal" class="modal-overlay" onclick="closeModal(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <h3>📤 导出数据</h3>
+    <p>复制下方全部文本，发送到微信/QQ/备忘录，在另一台设备点击"导入数据"粘贴恢复。</p>
+    <textarea id="exportText" class="modal-textarea" readonly></textarea>
+    <div class="modal-btns">
+      <button class="modal-btn modal-btn-primary" onclick="copyExport()">📋 复制文本</button>
+      <button class="modal-btn modal-btn-secondary" onclick="closeExportModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导入弹窗 -->
+<div id="importModal" class="modal-overlay" onclick="closeModal(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <h3>📥 导入数据</h3>
+    <p>粘贴之前导出的文本，点击恢复。⚠️ 这会覆盖当前设备的数据！</p>
+    <textarea id="importText" class="modal-textarea" placeholder="粘贴导出的JSON文本到这里..."></textarea>
+    <div class="modal-btns">
+      <button class="modal-btn modal-btn-primary" onclick="doImport()">✅ 恢复数据</button>
+      <button class="modal-btn modal-btn-secondary" onclick="closeImportModal()">取消</button>
+    </div>
   </div>
 </div>
 
 <script>
-// ========== 配置 ==========
-const SUPABASE_URL = 'https://nczfbvigcsolulupscyn.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_cVIsUKxIM6AMq9eBfDF08A_oiOVe3wL';
-const USER_EMAIL = '3224118667@qq.com';
-
 const START_DATE = new Date(2026, 4, 14);
 const PHASES = [
   { name: "🚀 第一阶段：筑基期", start: new Date(2026, 4, 14), end: new Date(2027, 4, 14) },
@@ -513,152 +581,34 @@ const DAILY_TASKS = [
   { time: "22:20-22:50", subject: "英语/复盘", text: "长难句1句+今日复盘+明日计划", motto: "复盘是逆袭的加速器 ⚡", duration: 0.5 }
 ];
 
-// ========== 全局状态 ==========
-let supabaseClient = null;
 let currentYear = 2026;
 let currentMonth = 4;
 let selectedDate = new Date();
 let studyData = {};
+const STORAGE_KEY = "shzStudyData_v2";
 
-// ========== 初始化（免登录） ==========
-async function initApp() {
-  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  // 生成固定用户ID（基于邮箱的哈希）
-  const userId = await generateUserId(USER_EMAIL);
-
-  // 显示主界面
-  document.getElementById('loadingOverlay').style.display = 'none';
-  document.getElementById('container').style.display = 'block';
-  updateSyncStatus('syncing');
-
-  // 加载本地缓存
-  const cached = localStorage.getItem('shzStudyData_cache');
-  if (cached) {
-    try { studyData = JSON.parse(cached); } catch(e) {}
-    renderCalendar();
-    renderTasks();
-    updateStats();
-    checkMissedDays();
-  }
-
-  // 从云端加载
-  await loadData(userId);
-
-  // 订阅实时更新
-  subscribeToChanges(userId);
-}
-
-async function generateUserId(email) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(email);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// ========== 数据层 ==========
-async function loadData(userId) {
+function loadData() {
   try {
-    const { data, error } = await supabaseClient
-      .from('study_records')
-      .select('date, tasks, updated_at')
-      .eq('user_id', userId)
-      .order('date', { ascending: true });
-
-    if (error) {
-      console.error('云端加载失败', error);
-      updateSyncStatus('offline');
-      return;
-    }
-
-    data.forEach(record => {
-      studyData[record.date] = record.tasks;
-    });
-
-    localStorage.setItem('shzStudyData_cache', JSON.stringify(studyData));
-    updateSyncStatus('synced');
-
-    renderCalendar();
-    renderTasks();
-    updateStats();
-    checkMissedDays();
-  } catch(e) {
-    console.error('加载异常', e);
-    updateSyncStatus('offline');
-  }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) studyData = JSON.parse(raw);
+  } catch(e) { studyData = {}; }
 }
 
-async function saveToCloud(dateStr, tasks) {
-  const userId = await generateUserId(USER_EMAIL);
-  localStorage.setItem('shzStudyData_cache', JSON.stringify(studyData));
-  updateSyncStatus('syncing');
-
-  try {
-    const { error } = await supabaseClient
-      .from('study_records')
-      .upsert({
-        user_id: userId,
-        date: dateStr,
-        tasks: tasks,
-        updated_at: new Date().toISOString()
-      }, { onConflict: ['user_id', 'date'] });
-
-    if (error) {
-      console.error('同步失败', error);
-      updateSyncStatus('offline');
-    } else {
-      updateSyncStatus('synced');
-    }
-  } catch(e) {
-    console.error('同步异常', e);
-    updateSyncStatus('offline');
-  }
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(studyData));
 }
 
-function subscribeToChanges(userId) {
-  supabaseClient
-    .channel('study_sync_' + userId.substring(0, 20))
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'study_records',
-      filter: `user_id=eq.${userId}`
-    }, payload => {
-      if (payload.new && payload.new.date) {
-        studyData[payload.new.date] = payload.new.tasks;
-        localStorage.setItem('shzStudyData_cache', JSON.stringify(studyData));
-        renderCalendar();
-        renderTasks();
-        updateStats();
-        checkMissedDays();
-      }
-    })
-    .subscribe();
+function formatDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-function updateSyncStatus(status) {
-  const dot = document.getElementById('syncStatusDot');
-  const text = document.getElementById('syncStatusText');
-  if (!dot || !text) return;
-
-  if (status === 'synced') {
-    dot.style.background = '#4caf50';
-    text.textContent = '已同步';
-  } else if (status === 'syncing') {
-    dot.style.background = '#2196f3';
-    text.textContent = '同步中...';
-  } else if (status === 'offline') {
-    dot.style.background = '#ccc';
-    text.textContent = '离线';
-  }
-}
-
-// ========== 日历渲染 ==========
 function renderCalendar() {
-  const grid = document.getElementById('daysGrid');
-  grid.innerHTML = '';
-  document.getElementById('calendarTitle').textContent = `${currentYear}年${currentMonth + 1}月`;
+  const grid = document.getElementById("daysGrid");
+  grid.innerHTML = "";
+  document.getElementById("calendarTitle").textContent = `${currentYear}年${currentMonth + 1}月`;
 
   const firstDay = new Date(currentYear, currentMonth, 1);
   const lastDay = new Date(currentYear, currentMonth + 1, 0);
@@ -666,8 +616,8 @@ function renderCalendar() {
   const daysInMonth = lastDay.getDate();
 
   for (let i = 0; i < startWeekday; i++) {
-    const empty = document.createElement('div');
-    empty.className = 'day-cell day-empty';
+    const empty = document.createElement("div");
+    empty.className = "day-cell day-empty";
     grid.appendChild(empty);
   }
 
@@ -678,31 +628,31 @@ function renderCalendar() {
     const date = new Date(currentYear, currentMonth, day);
     date.setHours(0,0,0,0);
     const dateStr = formatDate(date);
-    const cell = document.createElement('div');
-    cell.className = 'day-cell';
+    const cell = document.createElement("div");
+    cell.className = "day-cell";
     cell.innerHTML = `<div class="day-num">${day}</div><div class="day-status"></div>`;
 
     if (date > today) {
-      cell.classList.add('day-future');
+      cell.classList.add("day-future");
     } else if (date < START_DATE) {
-      cell.classList.add('day-empty');
-      cell.style.cursor = 'default';
+      cell.classList.add("day-empty");
+      cell.style.cursor = "default";
     } else {
       const tasks = studyData[dateStr];
       if (tasks) {
         const completed = tasks.filter(t => t).length;
         const total = tasks.length;
-        if (completed === total) cell.classList.add('day-done');
-        else if (completed > 0) cell.classList.add('day-partial');
-        else cell.classList.add('day-missed');
+        if (completed === total) cell.classList.add("day-done");
+        else if (completed > 0) cell.classList.add("day-partial");
+        else cell.classList.add("day-missed");
       } else {
-        cell.classList.add('day-missed');
+        cell.classList.add("day-missed");
       }
       cell.onclick = () => selectDate(date);
     }
 
-    if (date.getTime() === today.getTime()) cell.classList.add('day-today');
-    if (date.getTime() === selectedDate.getTime()) cell.classList.add('day-selected');
+    if (date.getTime() === today.getTime()) cell.classList.add("day-today");
+    if (date.getTime() === selectedDate.getTime()) cell.classList.add("day-selected");
 
     grid.appendChild(cell);
   }
@@ -721,44 +671,36 @@ function selectDate(date) {
   renderTasks();
 }
 
-function formatDate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-// ========== 任务渲染 ==========
 function renderTasks() {
   const dateStr = formatDate(selectedDate);
   const tasks = studyData[dateStr] || DAILY_TASKS.map(() => false);
 
-  document.getElementById('taskDate').textContent = 
+  document.getElementById("taskDate").textContent = 
     `${selectedDate.getFullYear()}年${selectedDate.getMonth()+1}月${selectedDate.getDate()}日`;
 
   const phase = PHASES.find(p => selectedDate >= p.start && selectedDate <= p.end) || PHASES[PHASES.length - 1];
-  document.getElementById('taskPhase').textContent = phase ? phase.name : '';
+  document.getElementById("taskPhase").textContent = phase ? phase.name : "";
 
-  const list = document.getElementById('taskList');
-  list.innerHTML = '';
+  const list = document.getElementById("taskList");
+  list.innerHTML = "";
 
   let totalHours = 0;
   let completedHours = 0;
 
   DAILY_TASKS.forEach((task, idx) => {
-    const li = document.createElement('li');
-    li.className = 'task-item';
+    const li = document.createElement("li");
+    li.className = "task-item";
     if (tasks[idx]) {
-      li.classList.add('completed');
+      li.classList.add("completed");
       completedHours += task.duration;
     }
     totalHours += task.duration;
 
     li.innerHTML = `
       <input type="checkbox" class="task-checkbox" 
-        ${tasks[idx] ? 'checked' : ''} 
+        ${tasks[idx] ? "checked" : ""} 
         onchange="toggleTask(${idx})"
-        ${selectedDate > new Date().setHours(0,0,0,0) ? 'disabled' : ''}>
+        ${selectedDate > new Date().setHours(0,0,0,0) ? "disabled" : ""}>
       <div class="task-content">
         <div class="task-time">${task.time} · ${task.subject} · ${task.duration}h</div>
         <div class="task-text">${task.text}</div>
@@ -768,36 +710,36 @@ function renderTasks() {
     list.appendChild(li);
   });
 
-  document.getElementById('todayHours').textContent = `${completedHours.toFixed(1)}h / ${totalHours}h`;
+  document.getElementById("todayHours").textContent = `${completedHours.toFixed(1)}h / ${totalHours}h`;
 
   const today = new Date();
   today.setHours(0,0,0,0);
   if (selectedDate.getTime() === today.getTime()) {
     if (completedHours === totalHours) {
-      document.getElementById('todayStatus').textContent = '🔥 今日全部完成！石大又近了一步！';
-      document.getElementById('todayStatus').style.color = '#c41e3a';
+      document.getElementById("todayStatus").textContent = "🔥 今日全部完成！石大又近了一步！";
+      document.getElementById("todayStatus").style.color = "#c41e3a";
     } else if (completedHours > 0) {
-      document.getElementById('todayStatus').textContent = `⚠️ 还有${(totalHours - completedHours).toFixed(1)}小时任务未完成，加油！`;
-      document.getElementById('todayStatus').style.color = '#ff9a56';
+      document.getElementById("todayStatus").textContent = `⚠️ 还有${(totalHours - completedHours).toFixed(1)}小时任务未完成，加油！`;
+      document.getElementById("todayStatus").style.color = "#ff9a56";
     } else {
-      document.getElementById('todayStatus').textContent = '⏰ 今日任务尚未开始，现在就开始吧！';
-      document.getElementById('todayStatus').style.color = '#888';
+      document.getElementById("todayStatus").textContent = "⏰ 今日任务尚未开始，现在就开始吧！";
+      document.getElementById("todayStatus").style.color = "#888";
     }
   } else {
-    document.getElementById('todayStatus').textContent = '💾 数据已实时同步，点击日历可补打卡';
-    document.getElementById('todayStatus').style.color = '#888';
+    document.getElementById("todayStatus").textContent = "💾 数据已保存到本地，点击左侧日历可补打卡";
+    document.getElementById("todayStatus").style.color = "#888";
   }
 
-  const btn = document.getElementById('saveBtn');
+  const btn = document.getElementById("saveBtn");
   if (selectedDate > today) {
-    btn.textContent = '⏳ 未来日期无法打卡';
+    btn.textContent = "⏳ 未来日期无法打卡";
     btn.disabled = true;
-    btn.style.opacity = '0.5';
+    btn.style.opacity = "0.5";
   } else {
-    btn.textContent = '💾 保存今日打卡';
+    btn.textContent = "💾 保存今日打卡";
     btn.disabled = false;
-    btn.style.opacity = '1';
-    btn.classList.remove('saved');
+    btn.style.opacity = "1";
+    btn.classList.remove("saved");
   }
 }
 
@@ -805,26 +747,28 @@ function toggleTask(index) {
   const dateStr = formatDate(selectedDate);
   if (!studyData[dateStr]) studyData[dateStr] = DAILY_TASKS.map(() => false);
   studyData[dateStr][index] = !studyData[dateStr][index];
+  saveData();
   renderTasks();
   updateStats();
-  saveToCloud(dateStr, studyData[dateStr]);
+  checkMissedDays();
+  renderCalendar();
 }
 
 function saveToday() {
+  saveData();
   renderCalendar();
   updateStats();
   checkMissedDays();
 
-  const btn = document.getElementById('saveBtn');
-  btn.textContent = '✅ 已实时同步到云端';
-  btn.classList.add('saved');
+  const btn = document.getElementById("saveBtn");
+  btn.textContent = "✅ 已保存到本地";
+  btn.classList.add("saved");
   setTimeout(() => {
-    btn.textContent = '💾 保存今日打卡';
-    btn.classList.remove('saved');
+    btn.textContent = "💾 保存今日打卡";
+    btn.classList.remove("saved");
   }, 2000);
 }
 
-// ========== 统计 ==========
 function updateStats() {
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -863,14 +807,13 @@ function updateStats() {
   }
   streak = tempStreak;
 
-  document.getElementById('totalDays').textContent = totalDays;
-  document.getElementById('streakDays').textContent = streak;
-  document.getElementById('missedDays').textContent = missed;
-  document.getElementById('monthRate').textContent = 
-    monthTotal > 0 ? Math.round((monthDone / monthTotal) * 100) + '%' : '0%';
+  document.getElementById("totalDays").textContent = totalDays;
+  document.getElementById("streakDays").textContent = streak;
+  document.getElementById("missedDays").textContent = missed;
+  document.getElementById("monthRate").textContent = 
+    monthTotal > 0 ? Math.round((monthDone / monthTotal) * 100) + "%" : "0%";
 }
 
-// ========== 漏学提醒 ==========
 function checkMissedDays() {
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -882,24 +825,89 @@ function checkMissedDays() {
     if (!tasks || tasks.filter(t => t).length === 0) missedList.push(`${d.getMonth()+1}月${d.getDate()}日`);
   }
 
-  const alertBox = document.getElementById('missedAlert');
+  const alertBox = document.getElementById("missedAlert");
   if (missedList.length > 0 && selectedDate.getTime() === today.getTime()) {
     const recentMissed = missedList.slice(-7);
     alertBox.innerHTML = `
       <div class="missed-alert">
         <strong>⚠️ 检测到漏学！最近漏学日期：</strong>
         <div class="missed-list">
-          ${recentMissed.map(d => `<span class="missed-tag">${d}</span>`).join('')}
+          ${recentMissed.map(d => `<span class="missed-tag">${d}</span>`).join("")}
         </div>
         <p style="margin-top:10px;font-size:12px;">点击左侧日历红色日期，可补打卡或查看当天任务</p>
       </div>
     `;
   } else {
-    alertBox.innerHTML = '';
+    alertBox.innerHTML = "";
   }
 }
 
-window.onload = initApp;
+// ========== 导出/导入 ==========
+function showExportModal() {
+  const data = localStorage.getItem(STORAGE_KEY) || "{}";
+  const compressed = btoa(unescape(encodeURIComponent(data)));
+  document.getElementById("exportText").value = compressed;
+  document.getElementById("exportModal").style.display = "flex";
+}
+
+function closeExportModal() {
+  document.getElementById("exportModal").style.display = "none";
+}
+
+function copyExport() {
+  const textarea = document.getElementById("exportText");
+  textarea.select();
+  document.execCommand("copy");
+  alert("📋 已复制到剪贴板！发送到微信/QQ/备忘录保存。");
+}
+
+function showImportModal() {
+  document.getElementById("importText").value = "";
+  document.getElementById("importModal").style.display = "flex";
+}
+
+function closeImportModal() {
+  document.getElementById("importModal").style.display = "none";
+}
+
+function doImport() {
+  const text = document.getElementById("importText").value.trim();
+  if (!text) return alert("请输入导出的数据文本");
+
+  try {
+    const json = decodeURIComponent(escape(atob(text)));
+    const parsed = JSON.parse(json);
+    if (typeof parsed !== "object") throw new Error("格式错误");
+
+    if (!confirm("⚠️ 这将覆盖当前设备的所有打卡数据，确定要恢复吗？")) return;
+
+    studyData = parsed;
+    saveData();
+    renderCalendar();
+    renderTasks();
+    updateStats();
+    checkMissedDays();
+    closeImportModal();
+    alert("✅ 数据恢复成功！");
+  } catch(e) {
+    alert("❌ 恢复失败，请检查粘贴的文本是否完整。错误：" + e.message);
+  }
+}
+
+function closeModal(e) {
+  if (e.target.classList.contains("modal-overlay")) {
+    e.target.style.display = "none";
+  }
+}
+
+// ========== 初始化 ==========
+window.onload = function() {
+  loadData();
+  renderCalendar();
+  renderTasks();
+  updateStats();
+  checkMissedDays();
+};
 </script>
 
 </body>
